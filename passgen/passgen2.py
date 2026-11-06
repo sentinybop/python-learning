@@ -27,14 +27,11 @@ class pass_gen:
                 return password
     def find(self, name):
         a=[]
-        # try:
         for line in self.read().splitlines():
             line1=line.split(':', 1)[0].lower()
             if name.lower() in line1:
                 a.append(line)
-        return a
-        # except AttributeError:
-        #     return a    
+        return a 
 
 def main():
     c=pass_gen('passwords.txt')
