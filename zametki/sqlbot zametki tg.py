@@ -10,7 +10,8 @@ from zametkiSQL import sqlite
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 class StatusUser(StatesGroup):
-    waiting = State()
+    waitingNote = State()
+    waitingDelNote = State()
 load_dotenv()
 token = os.getenv('BOT_TOKEN')
 if token is None:
@@ -24,43 +25,98 @@ def build_menu(menuName): # все кнопки
         builder.button(text='view your notes', callback_data='viewnotes')
     elif menuName == 'back':
         builder.button(text='back', callback_data='back')
+    elif menuName == 'back from del':
+        builder.button(text='back', callback_data='back2')     
     elif menuName == 'VN':
         builder.button(text='delete note', callback_data='delnote')
         builder.button(text='delete all notes', callback_data='dellallnote')
         builder.button(text='back', callback_data='back')
+    elif menuName == 'yn':
+        builder.button(text='yes', callback_data='y')
+        builder.button(text='no', callback_data='back2') 
+    elif menuName =='NNF':
+        builder.button(text='new note', callback_data='newnote')
+        builder.button(text='back', callback_data='back')
     return builder    
 @dp.message(Command('start')) # ответ с меню на start
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, state: FSMContext):
     mainmenu=build_menu('/start')
     await message.answer("Hi it's notes bot, tap 1 button for add note and 2 to view all notes", reply_markup=mainmenu.as_markup())
+    state.clear()
 @dp.callback_query(F.data == 'newnote')
 async def newnote(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer('Enter your text for note')
-    await state.set_state(StatusUser.waiting)
+    await state.set_state(StatusUser.waitingNote)
     await callback.answer()
-@dp.message(StatusUser.waiting)
+@dp.message(StatusUser.waitingNote)
 async def got_message(message: Message, state: FSMContext):
     user_id = message.from_user.id
     c.add_note(user_id, message.text)
     await message.answer(f"Your note,'{message.text}' has been added!", reply_markup=build_menu('/start').as_markup())
     await state.clear()
-@dp.callback_query(F.data=='viewnotes')
+@dp.callback_query((F.data=='viewnotes') | (F.data == 'back2'))
 async def viewnotes(callback: CallbackQuery):
     user_id = callback.from_user.id
     row = c.view_notes(user_id)
+    print(row)
     notes = []
-    if not row == 'notes not found':
+    if not row == 'notes not found' and not row == notes:
         for i, (note_id, text) in enumerate(row, start=1):
             notes.append(f'{i}. {text}')
+    else:
+        await callback.message.edit_text('notes not found!', reply_markup=build_menu('NNF').as_markup())
+        await callback.answer()
+        return        
     result= '\n'.join(notes)
-    await callback.message.edit_text(f'your notes:\n {result}', reply_markup=build_menu('VN').as_markup())
+    await callback.message.edit_text(f'your notes:\n{result}', reply_markup=build_menu('VN').as_markup())
+    await callback.answer()
 @dp.callback_query(F.data=='back')
 async def back(callback: CallbackQuery):
+    await callback.message.edit_text("Hi it's notes bot, tap 1 button for add note and 2 to view all notes", reply_markup=build_menu('/start').as_markup())
+@dp.callback_query(F.data=='delnote')
+async def delnote(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text('Enter what number of note you want to delete', reply_markup=build_menu('back from del').as_markup())
+    await state.set_state(StatusUser.waitingDelNote)
+    await callback.answer()
+@dp.message(StatusUser.waitingDelNote)
+async def got_number(message: Message, state: FSMContext):
+    user_id=message.from_user.id
+    if not message.text.isdigit():
+        await message.answer('Send a number from the list')
+        return
+    nput=int(message.text)
+    row = c.view_notes(user_id)
+    if row == 'notes not found':
+        await message.edit_text('notes not found!')
+        return
+    if not 1<= nput <=len(row):
+        await message.answer('Send a number from the list')
+        return
+    id=row[nput-1][0]
+    c.del_notes(id, user_id)
+    msg = await message.answer('complete!')    
+    await state.clear()
+    await asyncio.sleep(1)
+    row = c.view_notes(user_id)
+    notes = []
+    for i, (note_id, text) in enumerate(row, start=1):
+        notes.append(f'{i}. {text}')
+    result= '\n'.join(notes)
+    await msg.edit_text(f'your notes:\n{result}', reply_markup=build_menu('VN').as_markup())
+@dp.callback_query(F.data=='dellallnote')
+async def delallnoteyn(callback: CallbackQuery):
+    await callback.message.edit_text('Are you sure?', reply_markup=build_menu('yn').as_markup())
+@dp.callback_query(F.data=='y')
+async def delallnotey(callback: CallbackQuery):
+    user_id= callback.from_user.id
+    c.del_all_notes(user_id)
+    await callback.message.edit_text('complete!')  
+    await asyncio.sleep(1)
     await callback.message.edit_text("Hi it's notes bot, tap 1 button for add note and 2 to view all notes", reply_markup=build_menu('/start').as_markup())
 async def main(): # start bot
     bot = Bot(token=token)
     await dp.start_polling(bot)
 
+
 if __name__ == '__main__':
     asyncio.run(main())
-
