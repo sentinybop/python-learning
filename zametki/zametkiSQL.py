@@ -14,7 +14,7 @@ class sqlite:
         self.c.execute('''INSERT INTO user (user_id, text) VALUES (?, ?)''', (user_id, text,))
         self.con.commit()
     def view_notes(self, user_id):
-        self.c.execute('''SELECT id, text FROM user WHERE user_id = ?''', (user_id,))
+        self.c.execute('''SELECT id, text FROM user WHERE user_id = ? ORDER BY id''', (user_id,))
         row = self.c.fetchall()
         if row is None:
             return 'notes not found'
