@@ -42,7 +42,7 @@ def build_menu(menuName): # все кнопки
 async def cmd_start(message: Message, state: FSMContext):
     mainmenu=build_menu('/start')
     await message.answer("Hi it's notes bot, tap 1 button for add note and 2 to view all notes", reply_markup=mainmenu.as_markup())
-    state.clear()
+    await state.clear()
 @dp.callback_query(F.data == 'newnote')
 async def newnote(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer('Enter your text for note')
@@ -58,9 +58,8 @@ async def got_message(message: Message, state: FSMContext):
 async def viewnotes(callback: CallbackQuery):
     user_id = callback.from_user.id
     row = c.view_notes(user_id)
-    print(row)
     notes = []
-    if not row == 'notes not found' and not row == notes:
+    if not row == notes:
         for i, (note_id, text) in enumerate(row, start=1):
             notes.append(f'{i}. {text}')
     else:
@@ -86,9 +85,6 @@ async def got_number(message: Message, state: FSMContext):
         return
     nput=int(message.text)
     row = c.view_notes(user_id)
-    if row == 'notes not found':
-        await message.edit_text('notes not found!')
-        return
     if not 1<= nput <=len(row):
         await message.answer('Send a number from the list')
         return
